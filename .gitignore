@@ -1,0 +1,28 @@
+# Virtual Environment
+venv/
+pdf_bot_env/
+
+# Environment Variables
+.env
+
+# Python Cache
+__pycache__/
+*.pyc
+*.pyo
+
+# IDE
+.vscode/
+.idea/
+
+# Logs
+*.log
+
+# Temporary Files
+temp/
+
+# ChromaDB Data
+data/vector_store/
+
+# OS Files
+.DS_Store
+Thumbs.db
