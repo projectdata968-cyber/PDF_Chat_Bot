@@ -113,9 +113,22 @@ class DocumentProcessor:
         )
 
         all_docs = []
+        processed_files = set()
 
         # Zip file objects with their saved paths to retain filename access
         for file_obj, file_path in zip(files, file_paths):
+
+            if file_obj.filename in processed_files:
+
+                logger.warning(
+                    f"Skipping duplicate file: {file_obj.filename}"
+                )
+
+                continue
+
+            processed_files.add(
+                file_obj.filename
+            )
 
             scanned = self.is_scanned_pdf(
                 file_path
@@ -143,6 +156,7 @@ class DocumentProcessor:
                         file_path
                     )
                 )
+                
             for doc in docs:
                 # Ensure a metadata dictionary exists
                 if "metadata" not in doc or doc["metadata"] is None:

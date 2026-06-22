@@ -1,3 +1,4 @@
+import time
 import fitz
 import numpy as np
 from PIL import Image
@@ -13,9 +14,9 @@ class OCRProcessor:
             use_angle_cls=False,
             lang="en",
             enable_mkldnn=False,
-            ocr_version="PP-OCRv5",
-            cpu_threads=4,             # Parallel processing threads for better performance
-            det_limit_side_len=960,    # Limits massive layout images for cleaner text grouping
+            cpu_threads=2,             # Parallel processing threads for better performance
+            ocr_version="PP-OCRv4",
+            det_limit_side_len=640,    # Limits massive layout images for cleaner text grouping
             det_limit_type="max",       # Uses max dimension limit to handle various page sizes effectively
         )
 
@@ -24,13 +25,34 @@ class OCRProcessor:
         pdf = fitz.open(pdf_path)
 
         for page_num, page in enumerate(pdf):
+
             logger.info(f"Starting OCR page {page_num + 1}/{len(pdf)}")
-            pix = page.get_pixmap(dpi=150)
+            pix = page.get_pixmap(dpi=75)
             img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+
+            MAX_WIDTH = 800
+
+            if img.width > MAX_WIDTH:
+                ratio = MAX_WIDTH / img.width
+
+                img = img.resize(
+                    (
+                        MAX_WIDTH,
+                        int(img.height * ratio)
+                    )
+                )
+            if page_num == 0:
+                logger.info(
+                    f"Image size after resize: {img.width}x{img.height}"
+                )
+
             img_np = np.array(img)
 
+            start_time = time.time()
             result = self.ocr.ocr(img_np)
-            logger.info(f"Finished OCR page {page_num + 1}/{len(pdf)}")
+            end_time = time.time()
+            logger.info(f"Finished OCR page {page_num + 1}/{len(pdf)} in {end_time - start_time:.2f} seconds")
+
             extracted_text = []
 
             # Check if PaddleOCR returned valid lines
