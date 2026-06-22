@@ -10,10 +10,10 @@ class OCRProcessor:
     def __init__(self):
 
         self.ocr = PaddleOCR(
-            use_angle_cls=True,
+            use_angle_cls=False,
             lang="en",
             enable_mkldnn=False,
-            ocr_version="PP-OCRv3",
+            ocr_version="PP-OCRv5",
             cpu_threads=4,             # Parallel processing threads for better performance
             det_limit_side_len=960,    # Limits massive layout images for cleaner text grouping
             det_limit_type="max",       # Uses max dimension limit to handle various page sizes effectively
@@ -24,11 +24,13 @@ class OCRProcessor:
         pdf = fitz.open(pdf_path)
 
         for page_num, page in enumerate(pdf):
-            pix = page.get_pixmap(dpi=300)
+            logger.info(f"Starting OCR page {page_num + 1}/{len(pdf)}")
+            pix = page.get_pixmap(dpi=150)
             img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
             img_np = np.array(img)
 
             result = self.ocr.ocr(img_np)
+            logger.info(f"Finished OCR page {page_num + 1}/{len(pdf)}")
             extracted_text = []
 
             # Check if PaddleOCR returned valid lines

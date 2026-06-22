@@ -1,4 +1,5 @@
 import requests
+import urllib.parse
 from utils.config import BACKEND_URL
 
 
@@ -99,11 +100,17 @@ def fetch_stored_documents() -> list:
 def delete_document_from_backend(filename: str) -> bool:
     """Sends a request to delete a document and its vectors from the backend."""
     try:
-        response = requests.delete(f"{BACKEND_URL}/documents/{filename}")
+
+        encoded_filename = urllib.parse.quote(filename, safe='')
+        response = requests.delete(f"{BACKEND_URL}/documents/{encoded_filename}")
+
         if response.status_code == 200:
+
             res_json = response.json()
             return res_json.get("status") == "success"
         return False
+    
     except Exception as e:
+        
         print(f"Error deleting document {filename}: {e}")
         return False

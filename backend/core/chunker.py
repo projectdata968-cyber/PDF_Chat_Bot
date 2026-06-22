@@ -36,32 +36,25 @@ class TextChunker:
             encoding.encode(text)
         )
 
-    def split_documents(
-        self,
-        docs: list[dict]
-    ) -> list[dict]:
-
+    def split_documents(self, docs: list[dict]) -> list[dict]:
         chunks = []
+        step = self.chunk_size - self.chunk_overlap
+        
+        # Safety check to prevent division by zero or negative steps
+        if step <= 0:
+            step = self.chunk_size
 
         for doc in docs:
-
             words = doc["text"].split()
-
+            if not words:
+                continue
+                
             start = 0
-
             while start < len(words):
-
                 end = start + self.chunk_size
-
-                chunk_text = " ".join(
-                    words[start:end]
-                )
-
-                token_count = (
-                    self.count_tokens(
-                        chunk_text
-                    )
-                )
+                chunk_text = " ".join(words[start:end])
+                
+                token_count = self.count_tokens(chunk_text)
 
                 chunks.append({
                     "text": chunk_text,
@@ -70,14 +63,7 @@ class TextChunker:
                         "tokens": token_count,
                     }
                 })
+                start += step
 
-                start += (
-                    self.chunk_size
-                    - self.chunk_overlap
-                )
-
-        logger.info(
-            f"Created {len(chunks)} chunks"
-        )
-
+        logger.info(f"Created {len(chunks)} chunks")
         return chunks

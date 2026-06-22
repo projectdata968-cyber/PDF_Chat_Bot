@@ -34,3 +34,4 @@ class PDFParser:
         )
 
         return docs
+    

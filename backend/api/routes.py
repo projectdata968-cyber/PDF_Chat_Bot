@@ -27,12 +27,36 @@ router = APIRouter()
 
 
 # =========================
-# SINGLETON INSTANCES
+# LAZY LOADING HELPERS
 # =========================
-document_processor = DocumentProcessor()
-embedding_model = EmbeddingModel()
-vector_store = ChromaVectorStore()
-rag_pipeline = RAGPipeline()
+_document_processor = None
+_embedding_model = None
+_vector_store = None
+_rag_pipeline = None
+
+def get_document_processor():
+    global _document_processor
+    if _document_processor is None:
+        _document_processor = DocumentProcessor()
+    return _document_processor
+
+def get_embedding_model():
+    global _embedding_model
+    if _embedding_model is None:
+        _embedding_model = EmbeddingModel()
+    return _embedding_model
+
+def get_vector_store():
+    global _vector_store
+    if _vector_store is None:
+        _vector_store = ChromaVectorStore()
+    return _vector_store
+
+def get_rag_pipeline():
+    global _rag_pipeline
+    if _rag_pipeline is None:
+        _rag_pipeline = RAGPipeline()
+    return _rag_pipeline
 
 
 # =========================
@@ -43,7 +67,6 @@ rag_pipeline = RAGPipeline()
     response_model=StandardAPIResponse[str]
 )
 async def health_check():
-
     return StandardAPIResponse(
         status="success",
         data="ok",
@@ -62,13 +85,16 @@ UploadFile = Annotated[FastAPIUploadFile, WithJsonSchema({"type": "string", "for
 async def upload_and_process_pdfs(
     files: Annotated[list[UploadFile], File(...)]
 ):
-
     try:
-
         logger.info(f"Received {len(files)} PDFs")
+        
+        # Lazy load singletons
+        dp = get_document_processor()
+        em = get_embedding_model()
+        vs = get_vector_store()
 
         # 1. Process PDFs (OCR + parsing + chunking)
-        chunks = await document_processor.process_documents(files)
+        chunks = await dp.process_documents(files)
 
         logger.info(f"Generated {len(chunks)} chunks")
 
@@ -76,16 +102,16 @@ async def upload_and_process_pdfs(
         texts = [c["text"] for c in chunks]
 
         # 3. Embeddings
-        embeddings = embedding_model.embed_documents(texts)
+        embeddings = em.embed_documents(texts)
 
         # 4. Store in vector DB
-        vector_store.add_documents(chunks, embeddings)
+        vs.add_documents(chunks, embeddings)
 
         # 5. Structured ingestion response
         response = PDFProcessResponse(
             documents_processed=len(files),
             chunks_created=len(chunks),
-            vectorstore_count=vector_store.collection.count(),
+            vectorstore_count=vs.collection.count(),
         )
 
         return StandardAPIResponse[PDFProcessResponse](
@@ -95,9 +121,7 @@ async def upload_and_process_pdfs(
         )
 
     except Exception as e:
-
         logger.exception("PDF ingestion failed")
-
         return StandardAPIResponse[PDFProcessResponse](
             status="error",
             message=str(e),
@@ -112,20 +136,15 @@ async def upload_and_process_pdfs(
     response_model=StandardAPIResponse
 )
 async def get_vectorstore_count():
-
     try:
-
-        count = vector_store.collection.count()
-
+        vs = get_vector_store()
+        count = vs.collection.count()
         return StandardAPIResponse(
             status="success",
             data=count,
         )
-
     except Exception as e:
-
         logger.exception("Vector count failed")
-
         return StandardAPIResponse(
             status="error",
             message=str(e),
@@ -142,14 +161,12 @@ async def get_vectorstore_count():
 async def vector_search(
     request: SearchQueryRequest
 ):
-
     try:
+        em = get_embedding_model()
+        vs = get_vector_store()
 
-        query_embedding = embedding_model.embed_query(
-            request.query
-        )
-
-        results = vector_store.collection.query(
+        query_embedding = em.embed_query(request.query)
+        results = vs.collection.query(
             query_embeddings=[query_embedding],
             n_results=request.top_k,
         )
@@ -158,11 +175,8 @@ async def vector_search(
             status="success",
             data=results,
         )
-
     except Exception as e:
-
         logger.exception("Vector search failed")
-
         return StandardAPIResponse(
             status="error",
             message=str(e),
@@ -179,13 +193,12 @@ async def vector_search(
 async def chat(
     request: ChatRequest
 ):
-
     try:
-
         logger.info(f"Chat query: {request.message}")
         top_k_val = getattr(request, "top_k", 5) 
 
-        response = rag_pipeline.ask(
+        rp = get_rag_pipeline()
+        response = rp.ask(
             query=request.message,
             top_k=top_k_val,
             documents=request.documents
@@ -195,50 +208,39 @@ async def chat(
             status="success",
             data=response,
         )
-
     except Exception as e:
-
         logger.exception("Chat failed")
-
         return StandardAPIResponse(
             status="error",
             message=str(e),
         )
 
+
 # =========================
-# stored documents
+# STORED DOCUMENTS
 # =========================
 @router.get("/documents")
 async def list_documents():
-
     try:
-
-        results = vector_store.collection.get(
-            include=["metadatas"]
-        )
-
+        vs = get_vector_store()
+        results = vs.collection.get(include=["metadatas"])
         docs = {}
 
         for meta in results["metadatas"]:
-
             filename = meta["filename"]
-
             if filename not in docs:
                 docs[filename] = {
                     "filename": filename,
                     "document_id": meta.get("document_id"),
                     "chunks": 0
                 }
-
             docs[filename]["chunks"] += 1
 
         return StandardAPIResponse(
             status="success",
             data=list(docs.values())
         )
-
     except Exception as e:
-
         return StandardAPIResponse(
             status="error",
             message=str(e)
@@ -246,27 +248,21 @@ async def list_documents():
     
 
 # =========================
-# delete documents
+# DELETE DOCUMENTS
 # =========================
 @router.delete("/documents/{filename}")
 async def delete_document(filename: str):
-
     try:
-
-        results = vector_store.collection.get(
-            where={"filename": filename}
-        )
-
+        vs = get_vector_store()
+        results = vs.collection.get(where={"filename": filename})
         ids = results["ids"]
 
         if ids:
-            vector_store.collection.delete(
-                ids=ids
-            )
+            vs.collection.delete(ids=ids)
 
-        settings = Settings() 
+        current_settings = Settings() 
         pdf_path = os.path.join(
-            settings.TEMPFILE_UPLOAD_DIRECTORY,
+            current_settings.TEMPFILE_UPLOAD_DIRECTORY,
             filename
         )
 
@@ -277,10 +273,8 @@ async def delete_document(filename: str):
             status="success",
             message=f"{filename} deleted"
         )
-
     except Exception as e:
-
         return StandardAPIResponse(
             status="error",
-            message=str(e)
+            message=str(e),
         )

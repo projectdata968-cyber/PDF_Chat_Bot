@@ -1,0 +1,39 @@
+name: Sync Backend to Hugging Face Hub
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'backend/**'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Push Backend Subdirectory to Hugging Face Space
+        run: |
+          git config --global user.email "deploy-agent@github.com"
+          git config --global user.name "GitHub Action"
+          
+          # Clone the existing remote Space to safeguard its README metadata framework
+          git clone https://deploy:${{ secrets.HF_TOKEN }}@huggingface.co/spaces/Nimesh968/pdf-chatbot-backend hf_space
+          
+          # Copy your local backend files into that target deployment tracker folder
+          cp -r backend/* hf_space/
+          
+          # Navigate into the deployment folder, track changes, and submit
+          cd hf_space
+          git add .
+          
+          # Check if there are actual changes to prevent empty commit failures
+          if git diff-index --quiet HEAD --; then
+            echo "No structural codebase modifications identified. Skipping submission cycle."
+          else
+            git commit -m "Automated backend synchronization update"
+            git push origin main
+          fi
