@@ -209,7 +209,6 @@ pdf_reader_bot/
    ```bash
    source pdf_bot_env/bin/activate  # On Windows: pdf_bot_env\Scripts\activate
    ```
-   Note: The virtual environment (`pdf_bot_env/`) is already included in the repository.
 
 3. **Install backend dependencies**
    ```bash
