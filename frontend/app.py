@@ -30,6 +30,9 @@ MAX_HISTORY = 20
 if "documents_processed" not in st.session_state:
     st.session_state.documents_processed = False
 
+if "uploader_key" not in st.session_state:
+    st.session_state.uploader_key = 0
+
 # =========================
 # HEADER
 # =========================
@@ -113,6 +116,7 @@ uploaded_files = st.file_uploader(
     "Select PDF files",
     type=["pdf"],
     accept_multiple_files=True,
+    key=f"uploader_{st.session_state.uploader_key}",
 )
 
 if st.button("Process PDFs", use_container_width=True):
@@ -124,6 +128,7 @@ if st.button("Process PDFs", use_container_width=True):
 
         if result["status"] == "success":
             st.session_state.documents_processed = True
+            st.session_state.uploader_key += 1
             st.toast("PDFs processed successfully!")
             st.rerun()
         else:

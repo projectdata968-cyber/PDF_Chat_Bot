@@ -32,7 +32,7 @@ def upload_pdfs(files):
     response = requests.post(
         f"{BACKEND_URL}/upload_and_process_pdfs",
         files=payload,
-        timeout=600,
+        timeout=1800,
     )
 
     return response.json()
